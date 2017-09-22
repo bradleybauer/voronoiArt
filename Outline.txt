@@ -17,9 +17,6 @@ Add vertices to image based on probability
         Add Vertex
     what distribution do i use?
 
-Give each vertex a color
-    color = average color around vertex
-
 For each pixel_j whose nearest vertex is vertex_i
-    set pixel_j's color to vertex_i's color
+    set pixel_j's color to average color around vertex_i
 
