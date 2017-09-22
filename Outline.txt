@@ -1,0 +1,25 @@
+I want to make art from images and math.
+Inspiration from here https://github.com/esimov/triangle
+
+Compute intensity image
+Normalize intensity image
+
+Convolve intensity image with gaussian kernel
+OR
+Convolve gradient of image with gaussian kernel
+OR
+Sqrt gradient of image
+OR
+Sqrt convolution of gradient of image with gaussian kernel
+
+Add vertices to image based on probability
+    if distribution(0,1) < intensityAtPoint
+        Add Vertex
+    what distribution do i use?
+
+Give each vertex a color
+    color = average color around vertex
+
+For each pixel_j whose nearest vertex is vertex_i
+    set pixel_j's color to vertex_i's color
+
