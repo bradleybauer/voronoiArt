@@ -22,8 +22,9 @@ int main() {
 	// Compute gradient
 	process.gradient(data);
 	std::cout << data.maxCoeff() << std::endl;
+	// data = data.array().pow(1./2);
 
-	data /= data.maxCoeff();
+	data /= data.maxCoeff()*6.;
 
 	// Find vertices
 	Matrix<int, Dynamic, 2> vertices(image.get_height()*image.get_width()/2,2);
