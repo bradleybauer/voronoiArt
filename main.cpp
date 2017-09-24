@@ -13,16 +13,16 @@ int main() {
 
 	// Get intensities
 	MatrixXd data(image.get_height(), image.get_width());
+	std::cout << "Converting to grayscale" << std::endl;
 	process.intensity(image, data);
-	std::cout << "Grayscale done" << std::endl;
 
 	// Compute blur
+	std::cout << "Applying blur" << std::endl;
 	process.gaussianConvolve(11, data);
-	std::cout << "Blur done" << std::endl;
 
 	// Compute sobel filter
+	std::cout << "Applying sobel" << std::endl;
 	process.sobel(data);
-	std::cout << "Sobel done" << std::endl;
 
 	// data = data.array().sqrt();
 	data /= data.maxCoeff();
@@ -35,8 +35,8 @@ int main() {
 	// c = 1D number of pixels belonging to vertex
 	Matrix<long, Dynamic, 6> vertices(image.get_height()*image.get_width()/2, 6);
 	vertices.setZero();
+	std::cout << "Finding vertices" << std::endl;
 	process.computeVertices(vertices, data, max_vertices);
-	std::cout << "Vertices done" << std::endl;
 
 	// Color image based on vertices
 	process.colorImageWithVertices(image, vertices);
