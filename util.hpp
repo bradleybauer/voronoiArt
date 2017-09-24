@@ -8,33 +8,33 @@ class Process {
 public:
 	Process(){};
 
-	void gaussianConvolve(int kernel_size, MatrixXd& data) {
-		if (kernel_size % 2 == 0) {
-			std::cout << "Please use odd sized kernels" << std::endl;
-			exit(1);
-		}
+	void gaussianConvolve(int kernel_width, MatrixXd& data) {
+		kernel_width += kernel_width % 2 == 0; 
 		// compute gaussian kernel
-		MatrixXd kernel(kernel_size,kernel_size);
-		for (int i = 0; i < kernel_size; ++i) {
-			for (int j = 0; j < kernel_size; ++j) {
+		MatrixXd kernel(kernel_width,kernel_width);
+		for (int i = 0; i < kernel_width; ++i) {
+			for (int j = 0; j < kernel_width; ++j) {
 				// Generate coordinates
 				Vector2d p = {i, j};
-				p /= double(kernel_size-1);
+				p /= double(kernel_width-1);
 				p = p.array() * 2. - 1.;
 				p = p.array() * p.array();
 				p*=6.;
+
 				const double sigmaSqrd = 20;
-				kernel(i,j) = 1./(2.*3.141592*sigmaSqrd)*std::exp(-p.sum()/(2.*sigmaSqrd));
+				const double pi = 3.14159268;
+				const double X = p.sum();
+				kernel(i,j) = 1./(2.*pi*sigmaSqrd)*std::exp(-X/(2.*sigmaSqrd));
 			}
 		}
 		convolve_mirror_pad(data, kernel);
 	}
 
-	void gradient(MatrixXd& data) {
+	void sobel(MatrixXd& data) {
 		MatrixXd D(3,3);
 		D << -1,0,1,
 		     -2,0,2,
-		     -1,0,1;
+			 -1,0,1;
 		MatrixXd temp = data;
 		convolve_mirror_pad(temp, D);
 		D = D.transpose().eval();
@@ -45,10 +45,10 @@ public:
 	void intensity(png::image<png::rgb_pixel_16>& image, MatrixXd& data) {
 		for (int i = 0; i < data.rows(); ++i) {
 			for (int j = 0; j < data.cols(); ++j) {
-				double r = image[i][j].red/65535.;
-				double g = image[i][j].green/65535.;
-				double b = image[i][j].blue/65535.;
-				data(i,j) = sqrt((r*r + g*g + b*b)/3.);
+				const double r = .33*image[i][j].red/65535.;
+				const double g = .58*image[i][j].green/65535.;
+				const double b = .11*image[i][j].blue/65535.;
+				data(i,j) = r + g + b;
 			}
 		}
 	}
@@ -66,12 +66,18 @@ public:
 	//     So for each pixel in the image we have to loop about 6 times, we have to compute 6 distances
 	//     So the number of distance computations, the num of loops, is 6 * width * height
 	//     instead of being Num_Vertices * width * height.
-	//     However, to compute the list of lists requires Num_Vertices^2 loops?
+	//     However, to compute the list of lists requires about .5 * Num_Vertices^2 loops?
 	//     That might make this optimization less efficient
+	//
+	//     I think the coloring computation could benefit greatly from running on the graphics card
 	void computeVertices(Matrix<int, Dynamic, 2>& vertices,
-	                     MatrixXd& data) {
+	                     MatrixXd& data, const int max_vertices) {
 		auto eng = std::default_random_engine(std::time(0));
-		auto dist = std::uniform_real_distribution<double>(0, 1);
+		// A larger minimum value here causes larger sections of the image to be
+		// covered by a single voronoi cell.
+		const double minimum = .04;
+		const double maximum = 1.;
+		auto dist = std::uniform_real_distribution<double>(minimum, maximum);
 		int count = 0;
 		for (int i = 0; i < data.rows(); ++i) {
 			for (int j = 0; j < data.cols(); ++j) {
@@ -83,6 +89,16 @@ public:
 			}
 		}
 		vertices.conservativeResize(count, 2);
+		auto dist2 = std::uniform_real_distribution<double>(0,1);
+		int rows = vertices.rows();
+		while (rows > max_vertices) {
+			int rowToRemove = int(dist2(eng) * vertices.rows());
+			rows--;
+			if( rowToRemove < rows )
+					vertices.block(rowToRemove, 0, rows-rowToRemove, 2) =
+						vertices.block(rowToRemove+1, 0, rows-rowToRemove,2);
+			vertices.conservativeResize(rows, 2);
+		}
 	}
 
 	void colorImageWithVertices(png::image<png::rgb_pixel_16>& image,
@@ -90,28 +106,26 @@ public:
 		// loop through image pixels
 		//    find vertex that is closest to pixel
 		//    set pixel to average color of image around point vertex
-		int height = image.get_height();
-		int width = image.get_width();
+		const int height = image.get_height();
+		const int width = image.get_width();
+		int indx_of_min;
+		double d, dd, x, y;
 		for (int i = 0; i < height; ++i) {
-			std::cout << "Progress:" << i/float(image.get_height()) <<std::endl;
+			printf("Progress: %f\r", i/float(height)); fflush(stdout);
 			for (int j = 0; j < width; ++j) {
-				int indx_of_min = 0;
-				double d = std::numeric_limits<double>::infinity();
+				indx_of_min = 0;
+				d = std::numeric_limits<double>::infinity();
 				for (int k = 0; k < vertices.rows(); ++k) {
-					double x = j - vertices(k, 1);
-					double y = i - vertices(k, 0);
-					double dd = std::sqrt((x*x + y*y));
-					// double dd = std::fabs(x) + std::fabs(y);
+					x = j - vertices(k, 1);
+					y = i - vertices(k, 0);
+					dd = x*x + y*y;
+					// dd = std::fabs(x) + std::fabs(y);
 					if (dd < d) {
 						indx_of_min = k;
 						d = dd;
 					}
 				}
-				png::rgb_pixel_16 pix = image[vertices(indx_of_min,0)][vertices(indx_of_min,1)];
-				double r = pix.red;
-				double g = pix.green;
-				double b = pix.blue;
-				image[i][j] = png::rgb_pixel_16(r,g,b);
+				image[i][j] = image[vertices(indx_of_min,0)][vertices(indx_of_min,1)];
 			}
 		}
 	}
@@ -129,21 +143,21 @@ private:
 		int kern_spread_row = kernel.rows() - kernel.rows()/2-1;
 		int rows = data.rows();
 		int cols = data.cols();
+		double sum = 0.;
+		int x, y;
 		for (int i = 0; i < rows; ++i) {
 			for (int j = 0; j < cols; ++j) {
-				double sum = 0;
 				for (int ii = -kern_spread_row; ii <= kern_spread_row; ++ii) {
 					for (int jj = -kern_spread_col; jj <= kern_spread_col; ++jj) {
-						int x = jj+j;
-						int y = ii+i;
-						if (x < 0) x = -x;
-						else if (x >= cols) x = 2*cols - x-1;
-						if (y < 0) y = -y;
-						else if (y >= rows) y = 2*rows - y-1;
+						x = fabs(jj+j);
+						y = fabs(ii+i);
+						if (x >= cols) x = 2*cols - x-1;
+						if (y >= rows) y = 2*rows - y-1;
 						sum += kernel(ii+kern_spread_row,jj+kern_spread_col) * data(y,x);
 					}
 				}
 				temp(i,j) = sum;
+				sum = 0;
 			}
 		}
 		// copy temporary matrix to data
