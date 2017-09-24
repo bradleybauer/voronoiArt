@@ -29,7 +29,12 @@ int main() {
 
 	// Find vertices
 	const int max_vertices = 5000;
-	Matrix<int, Dynamic, 2> vertices(image.get_height()*image.get_width()/2,2);
+	// each row in vertices contains (P, C, c)
+	// P = 2D position of vertex
+	// C = 3D color data
+	// c = 1D number of pixels belonging to vertex
+	Matrix<long, Dynamic, 6> vertices(image.get_height()*image.get_width()/2, 6);
+	vertices.setZero();
 	process.computeVertices(vertices, data, max_vertices);
 	std::cout << "Vertices done" << std::endl;
 
