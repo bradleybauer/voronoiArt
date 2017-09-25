@@ -1,10 +1,10 @@
 Inspiration from here https://github.com/esimov/triangle
 
-Constructs a set of random verticies based on the intensity of the grayscale of the image.
+Constructs a set of random verticies based on the intensity of the grayscale of the input image.
 
-Colors pixels based on the color of their nearest vertex.
+The color of a pixel in the ouput image is based on the color of its nearest vertex.
 
-The color of a vertex is simply the color of the original image at the position of the vertex.
+The color of vertex V is the average color of the pixels in the input image that are closer to V than to any other vertex.
 
 
 ![](example1.png)
